@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Flow & Glow v12.9</title>
+    <title>Flow & Glow v13.2</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#9b59b6">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
     <link rel="apple-touch-icon" href="logo.png">
 
     <style>
@@ -100,7 +99,7 @@
             padding-bottom: 30px; 
             display: flex; 
             justify-content: center; 
-            gap: 60px; /* 增加间距 */
+            gap: 60px; 
         }
         .icon-btn-wrapper {
             cursor: pointer; 
@@ -112,18 +111,12 @@
             transition: color 0.2s;
         }
         .icon-btn-wrapper:active { color: var(--primary-color); transform: scale(0.95); }
-        .icon-symbol { font-size: 32px; } /* 图标变大 */
-        .icon-label { font-size: 14px; font-weight: 500; } /* 文字变大 */
+        .icon-symbol { font-size: 32px; } 
+        .icon-label { font-size: 14px; font-weight: 500; }
 
-        /* 任务拆解文字按钮 */
         .planning-link-btn {
-            background: none; 
-            border: none; 
-            color: #999; 
-            cursor: pointer; 
-            font-size: 1.15em; /* 字体变大 */
-            padding: 15px; 
-            font-weight: 500;
+            background: none; border: none; color: #999; cursor: pointer; 
+            font-size: 1.15em; padding: 15px; font-weight: 500;
         }
 
         #app-container::-webkit-scrollbar { display: none; }
@@ -134,6 +127,7 @@
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.95); z-index: 100; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: 0.3s; backdrop-filter: blur(5px); }
         .modal-overlay.open { opacity: 1; pointer-events: auto; }
         .modal-card { width: 85%; max-width: 360px; max-height: 80%; overflow-y: auto; text-align: center; }
+        
         .heatmap-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 20px 0; }
         .heat-cell { aspect-ratio: 1; border-radius: 6px; background: #f0f0f0; position: relative; }
         .heat-cell span { position: absolute; bottom: -14px; left: 0; width: 100%; font-size: 10px; color: #aaa; }
@@ -221,7 +215,7 @@
         <h3>📝 复盘热力图</h3>
         <div id="heatmap-grid" class="heatmap-container"></div>
         <div id="summary-list" style="text-align:left; color:#666; font-size:0.9em; border-top:1px solid #eee; padding-top:15px; max-height: 200px; overflow-y: auto;"></div>
-        <button class="btn" style="margin-top:20px; width:100%; background:#2ecc71" onclick="exportToCSV()">📥 导出数据</button>
+        <button class="btn" style="margin-top:20px; width:100%; background:var(--primary-color)" onclick="exportToCSV()">📥 导出数据</button>
         <button onclick="closeModal('summary-modal')" style="background:none; border:none; color:#bbb; margin-top:15px; padding: 10px;">关闭</button>
     </div>
 </div>
@@ -229,6 +223,7 @@
 <div id="depot-modal" class="modal-overlay">
     <div class="modal-card">
         <h3>🧺 灵感篮子</h3>
+        <p style="font-size:0.8em; color:#aaa; margin-bottom:15px;">点击文字或火箭即可开始任务</p>
         <input type="text" id="depot-input" placeholder="输入灵感..." onkeydown="if(event.key==='Enter') addToDepot()" style="margin-bottom:10px;">
         <div id="depot-list" style="text-align:left; max-height:300px; overflow-y:auto;"></div>
         <button onclick="closeModal('depot-modal')" style="background:none; border:none; color:#bbb; margin-top:15px; padding: 10px;">关闭</button>
@@ -240,8 +235,10 @@
         window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
     }
 
+    // 核心数据：自动读取 localStorage
     let workLogs = JSON.parse(localStorage.getItem('flow_v11_logs')) || [];
     let depotTasks = JSON.parse(localStorage.getItem('flow_v11_tasks')) || [];
+    
     let subTasks = [];
     let currentTask = "";
     let currentIndex = -1;
@@ -264,11 +261,56 @@
     function toPlanning() { 
         let val = document.getElementById('big-task-input').value;
         if(!val) return alert("请先输入任务名称~");
-        document.getElementById('plan-title').innerText = val;
+        document.getElementById('plan-title').innerText = val; 
         showSection('step-planning');
         renderSubTasks();
     }
     
+    // --- 灵感篮子相关逻辑 ---
+    function addToDepot() {
+        let v = document.getElementById('depot-input').value;
+        if(v) { 
+            depotTasks.push(v); 
+            saveDepot();
+            document.getElementById('depot-input').value=""; 
+            updateDepotUI(); 
+        }
+    }
+    
+    function deleteFromDepot(i) {
+        depotTasks.splice(i, 1);
+        saveDepot();
+        updateDepotUI();
+    }
+    
+    function saveDepot() {
+        localStorage.setItem('flow_v11_tasks', JSON.stringify(depotTasks));
+    }
+
+    function updateDepotUI() {
+        document.getElementById('depot-list').innerHTML = depotTasks.map((t,i) => `
+            <div style="padding:12px 5px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                <span onclick="startFromDepot('${t}')" style="flex:1; cursor:pointer; font-size:1.1em;">${t}</span>
+                <div style="display:flex; gap:15px; align-items:center;">
+                    <span onclick="startFromDepot('${t}')" style="cursor:pointer; font-size:1.2em;" title="开始任务">🚀</span>
+                    <span onclick="deleteFromDepot(${i})" style="color:#ff6b6b; cursor:pointer; font-size:1.4em; padding:0 5px;" title="删除">×</span>
+                </div>
+            </div>`
+        ).join('');
+    }
+
+    // 从灵感直接开始任务
+    function startFromDepot(taskName) {
+        currentTask = taskName;
+        // 1. 关闭篮子
+        closeModal('depot-modal');
+        // 2. 更新 UI 显示
+        document.getElementById('current-task-name-display').innerText = currentTask;
+        // 3. 跳转到选择时长页面
+        showSection('step-setup');
+    }
+    // ---------------------------
+
     function addSubTask() {
         let input = document.getElementById('sub-task-input');
         if(input.value) { subTasks.push({name: input.value, done: false}); input.value = ""; renderSubTasks(); }
@@ -338,14 +380,6 @@
     }
     function startRest() { isRest = true; startTimer("🧘 休息时间", 5); }
     function backToPlanning() { isRest = false; if(subTasks.length) { renderSubTasks(); showSection('step-planning'); } else { location.reload(); } }
-
-    function addToDepot() {
-        let v = document.getElementById('depot-input').value;
-        if(v) { depotTasks.push(v); localStorage.setItem('flow_v11_tasks', JSON.stringify(depotTasks)); document.getElementById('depot-input').value=""; updateDepotUI(); }
-    }
-    function updateDepotUI() {
-        document.getElementById('depot-list').innerHTML = depotTasks.map((t,i) => `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">${t} <span onclick="depotTasks.splice(${i},1);localStorage.setItem('flow_v11_tasks',JSON.stringify(depotTasks));updateDepotUI()" style="color:#ff6b6b;cursor:pointer;">×</span></div>`).join('');
-    }
 
     function showDailySummary() {
         let grid = document.getElementById('heatmap-grid'); grid.innerHTML = "";
